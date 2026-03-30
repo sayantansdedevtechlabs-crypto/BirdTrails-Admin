@@ -12,7 +12,7 @@ import {
 } from '@mui/material';
 
 // 1. We import your NEWS logo here (Make sure it is saved in src/assets/news-logo.png)
-import newsLogo from '/Users/sayantan_banerjee/Documents/EKW-Bird_Trail_App/BOTH/bird-trail-admin/birdtrails-admin-react/src/assets/News-Logo-1-removebg-preview.png';
+import newsLogo from '../assets/News-Logo-1-removebg-preview.png';
 
 import PersonIcon from '@mui/icons-material/Person';
 import LockIcon from '@mui/icons-material/Lock';

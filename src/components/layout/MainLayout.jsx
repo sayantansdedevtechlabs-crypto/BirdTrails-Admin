@@ -15,7 +15,7 @@ import NotificationsRoundedIcon from '@mui/icons-material/NotificationsRounded';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 
 // Your Logo
-import newsLogo from '/Users/sayantan_banerjee/Documents/EKW-Bird_Trail_App/BOTH/bird-trail-admin/birdtrails-admin-react/src/assets/News-Logo-1-removebg-preview.png';
+import newsLogo from '../../assets/News-Logo-1-removebg-preview.png';
 
 const drawerWidth = 280;
 
