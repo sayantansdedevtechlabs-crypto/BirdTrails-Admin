@@ -8,33 +8,50 @@ import {
   Button, 
   Alert,
   InputAdornment,
-  IconButton
+  IconButton,
+  CircularProgress,
+  Fade,
+  Stack
 } from '@mui/material';
 
-// 1. We import your NEWS logo here (Make sure it is saved in src/assets/news-logo.png)
-import newsLogo from '../assets/News-Logo-1-removebg-preview.png';
+// --- DATABASE CLIENT ---
+import { supabase } from '../supabaseClient';
 
+// Assets & Icons
+import newsLogo from '../assets/News-Logo-1-removebg-preview.png';
 import PersonIcon from '@mui/icons-material/Person';
 import LockIcon from '@mui/icons-material/Lock';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import ShieldMoonIcon from '@mui/icons-material/ShieldMoon';
 
 const Login = () => {
   const navigate = useNavigate();
   
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
 
-    if (username === 'admin' && password === 'admin123') {
-      navigate('/dashboard'); 
-    } else {
-      setError('Invalid credentials. Try admin / admin123');
+    try {
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password,
+      });
+
+      if (authError) throw authError;
+      navigate('/'); 
+      
+    } catch (err) {
+      setError(err.message || 'Authentication failed. Please check your credentials.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -47,124 +64,103 @@ const Login = () => {
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'center',
-        // Your chosen background image
-        backgroundImage: 'url(https://plus.unsplash.com/premium_photo-1730160763932-4cba5dcc299e?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MzB8fGJpcmQlMjB3YWxscGFwZXJ8ZW58MHx8MHx8fDA%3D)',
+        backgroundImage: 'url(https://plus.unsplash.com/premium_photo-1730160763932-4cba5dcc299e?w=900&auto=format&fit=crop&q=60)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         position: 'relative',
-        
-        // Your dark overlay
+        overflow: 'hidden',
         '&::before': {
           content: '""',
           position: 'absolute',
           top: 0, right: 0, bottom: 0, left: 0,
-          backgroundColor: 'rgba(1, 11, 5, 0.4)', 
+          backgroundColor: 'rgba(1, 25, 10, 0.55)',
           zIndex: 1,
         }
       }}
     >
-      <Paper 
-        elevation={12} 
-        sx={{ 
-          p: { xs: 4, md: 6 }, 
-          width: '100%', 
-          maxWidth: 450, 
-          textAlign: 'center',
-          zIndex: 2, 
-          // Your 0.7 transparency + a blur effect for true Glassmorphism
-          backgroundColor: 'rgba(255, 255, 255, 0.22)', 
-          backdropFilter: 'blur(10px)', 
-          borderRadius: 4, 
-        }}
-      >
-        {/* The NEWS Logo replacing the old ForestIcon */}
-        <Box sx={{ display: 'flex', justifyContent: 'center',mb:1, width: '100%' }}>
-          <img 
-            src={newsLogo} 
-            alt="Nature Environment & Wildlife Society Logo" 
-            style={{ 
-              maxheight: '70px', // Slightly taller to read the text clearly
-              width: 'auto', 
-              maxWidth: '100%', 
-              objectFit: 'contain', 
-              marginBottom:8,
-              marginTop: -15,
-            }} 
-          />
-        </Box>
+      <Fade in={true} timeout={1000}>
+        <Paper 
+          elevation={0} 
+          sx={{ 
+            p: { xs: 4, md: 6 }, 
+            width: '90%', 
+            maxWidth: 450, 
+            textAlign: 'center',
+            zIndex: 2, 
+            backgroundColor: 'rgba(255, 255, 255, 0.12)', 
+            backdropFilter: 'blur(15px)', 
+            borderRadius: 6, 
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
+          }}
+        >
+          <Box sx={{ mb: 2 }}>
+            <img src={newsLogo} alt="NEWS Logo" style={{ height: '80px', width: 'auto', marginBottom: 16 }} />
+          </Box>
 
-        <Typography variant="h4" color="#034a03ff" sx={{ fontWeight: 800, mb: 0.5, letterSpacing: '-0.5px' }}>
-          BirdTrails
-        </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 4, fontWeight: 500 }}>
-          Scientific Research Portal
-        </Typography>
+          <Typography variant="h4" sx={{ fontWeight: 900, color: '#fff', mb: 0.5 }}>
+            BirdTrails
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 4, color: 'rgba(255,255,255,0.8)', fontWeight: 500, letterSpacing: 2 }}>
+            ADMINISTRATIVE PORTAL
+          </Typography>
 
-        {error && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>{error}</Alert>}
+          {error && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>{error}</Alert>}
 
-        <form onSubmit={handleLogin}>
-          <TextField
-            fullWidth
-            placeholder="Username"
-            variant="outlined"
-            margin="normal"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <PersonIcon color="action" />
-                </InputAdornment>
-              ),
-              // Added a slight white background to inputs so they stand out from the card
-              sx: { borderRadius: 2, backgroundColor: 'rgba(255, 255, 255, 0.6)' }
-            }}
-          />
-          
-          <TextField
-            fullWidth
-            placeholder="Password"
-            type={showPassword ? 'text' : 'password'}
-            variant="outlined"
-            margin="normal"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <LockIcon color="action" />
-                </InputAdornment>
-              ),
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton onClick={handleClickShowPassword} edge="end">
-                    {showPassword ? <VisibilityOff /> : <Visibility />}
-                  </IconButton>
-                </InputAdornment>
-              ),
-              sx: { borderRadius: 2, backgroundColor: 'rgba(255, 255, 255, 0.6)' }
-            }}
-          />
+          <form onSubmit={handleLogin}>
+            <Stack spacing={2}>
+              <TextField
+                fullWidth
+                placeholder="Administrator Email"
+                variant="outlined"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                InputProps={{
+                  startAdornment: (<InputAdornment position="start"><PersonIcon sx={{ color: '#fff' }} /></InputAdornment>),
+                  sx: { borderRadius: 3, backgroundColor: 'rgba(255, 255, 255, 0.15)', color: '#fff' }
+                }}
+              />
+              
+              <TextField
+                fullWidth
+                placeholder="Secure Password"
+                type={showPassword ? 'text' : 'password'}
+                variant="outlined"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                InputProps={{
+                  startAdornment: (<InputAdornment position="start"><LockIcon sx={{ color: '#fff' }} /></InputAdornment>),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton onClick={handleClickShowPassword} sx={{ color: '#fff' }}>
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                  sx: { borderRadius: 3, backgroundColor: 'rgba(255, 255, 255, 0.15)', color: '#fff' }
+                }}
+              />
 
-          <Button
-            type="submit"
-            fullWidth
-            variant="contained"
-            size="large"
-            disableElevation
-            sx={{ 
-              mt: 4, 
-              mb: 2, 
-              height: 52, 
-              borderRadius: 2,
-              fontSize: '1.1rem',
-              fontWeight: 700,
-            }}
-          >
-            Authenticate
-          </Button>
-        </form>
-      </Paper>
+              <Button
+                type="submit"
+                fullWidth
+                variant="contained"
+                disabled={isLoading}
+                sx={{ mt: 2, height: 56, borderRadius: 3, fontWeight: 800, backgroundColor: '#2D6A4F' }}
+              >
+                {isLoading ? <CircularProgress size={24} sx={{ color: '#fff' }} /> : 'Authenticate System'}
+              </Button>
+            </Stack>
+          </form>
+
+          <Box sx={{ mt: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, opacity: 0.7 }}>
+             <ShieldMoonIcon sx={{ color: '#fff', fontSize: 16 }} />
+             <Typography variant="caption" sx={{ color: '#fff', fontWeight: 600 }}>
+                End-to-End Encrypted Data Pipeline
+             </Typography>
+          </Box>
+        </Paper>
+      </Fade>
     </Box>
   );
 };

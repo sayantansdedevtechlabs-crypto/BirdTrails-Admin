@@ -1,48 +1,56 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider, CssBaseline } from '@mui/material';
-import { appTheme } from './theme/theme';
+import { supabase } from './supabaseClient';
 
-// Import our new pages
-import Login from './pages/Login';
+// Layouts & Pages
 import MainLayout from './components/layout/MainLayout';
 import Dashboard from './pages/Dashboard';
 import SpeciesList from './pages/SpeciesList';
 import ObservationList from './pages/ObservationList';
-import UserManagement from './pages/UserManagement'; 
 import CensusSessions from './pages/CensusSessions';
-
-// Temporary placeholders for the other pages so the sidebar doesn't crash when clicked
-const DummyPage = ({ title }) => <h2 style={{ color: '#2D3436' }}>{title} Module Coming Soon!</h2>;
+import UserManagement from './pages/UserManagement';
+import Login from './pages/Login';
 
 function App() {
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // 1. Check current session on load
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
+    });
+
+    // 2. Listen for login/logout changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>;
+
   return (
-    <ThemeProvider theme={appTheme}>
-      <CssBaseline /> 
-      
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          
-          {/* Notice how MainLayout wraps these nested routes! 
-            Whatever is active below gets injected into the <Outlet /> of MainLayout.
-          */}
-          <Route path="/" element={<MainLayout />}>
-            {/* Auto-redirect the base URL to dashboard */}
-            <Route index element={<Navigate to="/dashboard" replace />} />
-            
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="directory" element={<SpeciesList />} />
-            <Route path="observations" element={<ObservationList />} />
-            <Route path="census" element={<CensusSessions />} />
-            <Route path="users" element={<UserManagement />} />
-          </Route>
-          
-          {/* Catch-all */}
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </ThemeProvider>
+    <BrowserRouter>
+      <Routes>
+        {/* Public Route */}
+        <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
+
+        {/* Private Routes (Protected by session) */}
+        <Route path="/" element={session ? <MainLayout /> : <Navigate to="/login" />}>
+          <Route index element={<Dashboard />} />
+          <Route path="species" element={<SpeciesList />} />
+          <Route path="observations" element={<ObservationList />} />
+          <Route path="census" element={<CensusSessions />} />
+          <Route path="users" element={<UserManagement />} />
+        </Route>
+
+        {/* Catch-all redirect */}
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
