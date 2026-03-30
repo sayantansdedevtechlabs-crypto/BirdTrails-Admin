@@ -1,18 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { 
-  Box, 
-  Drawer, 
-  List, 
-  ListItem, 
-  ListItemButton, 
-  ListItemIcon, 
-  ListItemText, 
-  Typography, 
-  Avatar, 
-  Divider,
-  IconButton,
-  useTheme
+  Box, Drawer, AppBar, Toolbar, Typography, List, ListItem, 
+  ListItemButton, ListItemIcon, ListItemText, Avatar, IconButton, Badge, Divider, Stack
 } from '@mui/material';
 
 // --- DATABASE CLIENT ---
@@ -20,14 +10,14 @@ import { supabase } from '../../supabaseClient';
 
 // Icons
 import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded';
-import BugReportRoundedIcon from '@mui/icons-material/BugReportRounded';
-import LibraryBooksRoundedIcon from '@mui/icons-material/LibraryBooksRounded';
-import GroupRoundedIcon from '@mui/icons-material/GroupRounded';
-import AssignmentRoundedIcon from '@mui/icons-material/AssignmentRounded';
+import FormatListBulletedRoundedIcon from '@mui/icons-material/FormatListBulletedRounded';
+import MapRoundedIcon from '@mui/icons-material/MapRounded';
+import AssessmentRoundedIcon from '@mui/icons-material/AssessmentRounded';
+import PeopleAltRoundedIcon from '@mui/icons-material/PeopleAltRounded';
+import NotificationsRoundedIcon from '@mui/icons-material/NotificationsRounded';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
-import MenuOpenRoundedIcon from '@mui/icons-material/MenuOpenRounded';
 
-// Assets
+// Your Logo (Relative path for Render/Production)
 import newsLogo from '../../assets/News-Logo-1-removebg-preview.png';
 
 const drawerWidth = 280;
@@ -35,123 +25,172 @@ const drawerWidth = 280;
 const MainLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const theme = useTheme();
-  
-  // --- REAL LOGOUT LOGIC ---
+  const [userName, setUserName] = useState('Admin');
+  const [userInitials, setUserInitials] = useState('A');
+
+  // --- 1. FETCH USER DATA & INITIALS ---
+  useEffect(() => {
+    const getUserProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single();
+        
+        if (profile?.full_name) {
+          setUserName(profile.full_name);
+          setUserInitials(profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase());
+        }
+      }
+    };
+    getUserProfile();
+  }, []);
+
+  // --- 2. REAL SIGN OUT LOGIC ---
   const handleLogout = async () => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      
-      // App.jsx will detect the session cleared and redirect to /login
-      // but we force a navigate just to be snappy
-      navigate('/login'); 
+      navigate('/login');
     } catch (err) {
-      console.error("Error signing out:", err.message);
+      console.error("Logout failed:", err.message);
     }
   };
 
+  // Paths updated to match our App.jsx routes
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardRoundedIcon />, path: '/' },
-    { text: 'Bird Directory', icon: <LibraryBooksRoundedIcon />, path: '/species' },
-    { text: 'Observation Ledger', icon: <BugReportRoundedIcon />, path: '/observations' },
-    { text: 'Census Sessions', icon: <AssignmentRoundedIcon />, path: '/census' },
-    { text: 'User Management', icon: <GroupRoundedIcon />, path: '/users' },
+    { text: 'Bird Directory', icon: <FormatListBulletedRoundedIcon />, path: '/species' },
+    { text: 'Observations', icon: <MapRoundedIcon />, path: '/observations' },
+    { text: 'Census Sessions', icon: <AssessmentRoundedIcon />, path: '/census' },
+    { text: 'User Management', icon: <PeopleAltRoundedIcon />, path: '/users' },
   ];
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#F8FAFC' }}>
-      {/* Sidebar Drawer */}
+    <Box sx={{ display: 'flex', bgcolor: '#F4F7F6', minHeight: '100vh' }}>
+      
+      {/* 1. THE GLASS TOP-BAR */}
+      <AppBar 
+        position="fixed" 
+        elevation={0}
+        sx={{ 
+          width: `calc(100% - ${drawerWidth}px)`, 
+          ml: `${drawerWidth}px`,
+          backgroundColor: 'rgba(255, 255, 255, 0.9)',
+          backdropFilter: 'blur(8px)',
+          borderBottom: '1px solid rgba(0,0,0,0.05)',
+          color: 'text.primary',
+          zIndex: 1100 // Lower than drawer
+        }}
+      >
+        <Toolbar sx={{ justifyContent: 'space-between', py: 1 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.dark' }}>
+            {menuItems.find(m => m.path === location.pathname)?.text || 'Portal'}
+          </Typography>
+          
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <IconButton sx={{ bgcolor: 'rgba(0,0,0,0.04)' }}>
+              <Badge badgeContent={3} color="error">
+                <NotificationsRoundedIcon color="action" />
+              </Badge>
+            </IconButton>
+            <Divider orientation="vertical" variant="middle" flexItem />
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{ textAlign: 'right', display: { xs: 'none', sm: 'block' } }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>{userName}</Typography>
+                <Typography variant="caption" color="text.secondary">Project Admin</Typography>
+              </Box>
+              <Avatar sx={{ bgcolor: 'primary.main', width: 40, height: 40, fontWeight: 700 }}>{userInitials}</Avatar>
+            </Box>
+          </Box>
+        </Toolbar>
+      </AppBar>
+
+      {/* 2. THE PREMIUM DARK SIDEBAR */}
       <Drawer
         variant="permanent"
         sx={{
           width: drawerWidth,
           flexShrink: 0,
-          '& .MuiDrawer-paper': {
-            width: drawerWidth,
+          [`& .MuiDrawer-paper`]: { 
+            width: drawerWidth, 
             boxSizing: 'border-box',
-            borderRight: '1px solid #E2E8F0',
-            background: '#FFFFFF',
+            backgroundColor: '#0A1912', 
+            color: '#A4B8AE', 
+            borderRight: 'none',
+            boxShadow: '4px 0 24px rgba(0,0,0,0.05)',
+            display: 'flex',
+            flexDirection: 'column'
           },
         }}
       >
-        <Box sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
-          <img src={newsLogo} alt="NEWS Logo" style={{ height: 40 }} />
-          <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'primary.dark', lineHeight: 1.2 }}>
-              BirdTrails
-            </Typography>
-            <Typography variant="caption" color="text.secondary">Admin Panel</Typography>
+        {/* Sidebar Brand/Logo Area */}
+        <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', mt: 2 }}>
+          <Box sx={{ bgcolor: 'white', p: 1.5, borderRadius: 3, width: '100%', textAlign: 'center', mb: 2 }}>
+            <img src={newsLogo} alt="NEWS Logo" style={{ maxHeight: '50px', maxWidth: '100%', objectFit: 'contain' }} />
           </Box>
         </Box>
 
-        <Divider sx={{ mx: 2, mb: 2 }} />
+        {/* Navigation List */}
+        <Box sx={{ overflow: 'auto', px: 2, flexGrow: 1 }}>
+          <List>
+            {menuItems.map((item) => {
+              const isActive = location.pathname === item.path;
+              
+              return (
+                <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
+                  <ListItemButton 
+                    onClick={() => navigate(item.path)}
+                    sx={{
+                      borderRadius: 2.5, 
+                      py: 1.5,
+                      backgroundColor: isActive ? 'primary.main' : 'transparent',
+                      color: isActive ? '#FFFFFF' : '#A4B8AE',
+                      transition: 'all 0.2s ease-in-out',
+                      '&:hover': {
+                        backgroundColor: isActive ? 'primary.main' : 'rgba(255,255,255,0.05)',
+                        color: '#FFFFFF',
+                        transform: isActive ? 'none' : 'translateX(4px)' 
+                      }
+                    }}
+                  >
+                    <ListItemIcon sx={{ color: 'inherit', minWidth: 40 }}>
+                      {item.icon}
+                    </ListItemIcon>
+                    <ListItemText 
+                      primary={item.text} 
+                      primaryTypographyProps={{ fontWeight: isActive ? 600 : 500, fontSize: '0.95rem' }} 
+                    />
+                  </ListItemButton>
+                </ListItem>
+              );
+            })}
+          </List>
+        </Box>
 
-        <List sx={{ px: 2, flexGrow: 1 }}>
-          {menuItems.map((item) => {
-            const isActive = location.pathname === item.path;
-            return (
-              <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
-                <ListItemButton
-                  onClick={() => navigate(item.path)}
-                  sx={{
-                    borderRadius: 3,
-                    bgcolor: isActive ? 'primary.light' : 'transparent',
-                    color: isActive ? 'primary.main' : 'text.secondary',
-                    '&:hover': { bgcolor: isActive ? 'primary.light' : '#F1F5F9' },
-                  }}
-                >
-                  <ListItemIcon sx={{ color: isActive ? 'primary.main' : 'inherit', minWidth: 40 }}>
-                    {item.icon}
-                  </ListItemIcon>
-                  <ListItemText 
-                    primary={item.text} 
-                    primaryTypographyProps={{ fontWeight: isActive ? 700 : 500, fontSize: '0.9rem' }} 
-                  />
-                </ListItemButton>
-              </ListItem>
-            );
-          })}
-        </List>
-
-        {/* User Profile & Logout Section */}
-        <Box sx={{ p: 2, mt: 'auto' }}>
-          <Box sx={{ 
-            p: 2, 
-            borderRadius: 4, 
-            bgcolor: '#F8FAFC', 
-            border: '1px solid #E2E8F0',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1.5
-          }}>
-            <Avatar sx={{ bgcolor: 'primary.main', fontWeight: 700, width: 36, height: 36 }}>A</Avatar>
-            <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
-              <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>Administrator</Typography>
-              <Typography variant="caption" color="text.secondary" noWrap>System Control</Typography>
-            </Box>
-          </Box>
-          
+        {/* Logout at bottom */}
+        <Box sx={{ p: 2, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
           <ListItemButton 
             onClick={handleLogout}
             sx={{ 
-              mt: 1, 
-              borderRadius: 3, 
-              color: '#C62828',
-              '&:hover': { bgcolor: '#FFEBEE' } 
+              borderRadius: 2.5, 
+              color: '#ff6b6b', 
+              '&:hover': { bgcolor: 'rgba(255, 107, 107, 0.1)' } 
             }}
           >
             <ListItemIcon sx={{ color: 'inherit', minWidth: 40 }}>
               <LogoutRoundedIcon />
             </ListItemIcon>
-            <ListItemText primary="Sign Out" primaryTypographyProps={{ fontWeight: 700, fontSize: '0.9rem' }} />
+            <ListItemText primary="Sign Out" primaryTypographyProps={{ fontWeight: 600 }} />
           </ListItemButton>
         </Box>
       </Drawer>
 
-      {/* Main Content Area */}
-      <Box component="main" sx={{ flexGrow: 1, p: { xs: 3, md: 5 }, width: { sm: `calc(100% - ${drawerWidth}px)` } }}>
-        <Outlet />
+      {/* 3. MAIN CONTENT */}
+      <Box component="main" sx={{ flexGrow: 1, p: 4, mt: 8 }}>
+        <Outlet /> 
       </Box>
     </Box>
   );
