@@ -11,6 +11,10 @@ import CensusSessions from './pages/CensusSessions';
 import UserManagement from './pages/UserManagement';
 import Login from './pages/Login';
 
+
+// ➤ NEW: Import the Feedback Hub
+import FeedbackHub from './pages/FeedbackHub'; 
+
 function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -45,6 +49,9 @@ function App() {
           <Route path="observations" element={<ObservationList />} />
           <Route path="census" element={<CensusSessions />} />
           <Route path="users" element={<UserManagement />} />
+          
+          {/* ➤ NEW: Feedback Hub Route */}
+          <Route path="feedback" element={<FeedbackHub />} />
         </Route>
 
         {/* Catch-all redirect */}

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; 
 import { 
   Box, Typography, Grid, Paper, Card, CardContent, Avatar, 
-  Button, List, ListItem, ListItemAvatar, ListItemText, Divider, LinearProgress, Chip
+  Button, List, ListItem, ListItemAvatar, ListItemText, Divider, LinearProgress, Chip, Badge 
 } from '@mui/material';
 
 // --- DATABASE CLIENT ---
@@ -12,16 +13,18 @@ import ExploreRoundedIcon from '@mui/icons-material/ExploreRounded';
 import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
 import AssessmentRoundedIcon from '@mui/icons-material/AssessmentRounded';
 import PendingActionsRoundedIcon from '@mui/icons-material/PendingActionsRounded';
-import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
-import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import MapRoundedIcon from '@mui/icons-material/MapRounded';
+import ForumRoundedIcon from '@mui/icons-material/ForumRounded'; 
 
 const Dashboard = () => {
+  const navigate = useNavigate(); 
+
   const [stats, setStats] = useState({
     totalSpecies: 0,
     pendingLogs: 0,
     activeResearchers: 0,
-    censusLogs: 0
+    censusLogs: 0,
+    pendingFeedback: 0 
   });
   
   const [activityFeed, setActivityFeed] = useState([]);
@@ -29,23 +32,37 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchDashboardStats();
+
+    const channel = supabase
+      .channel('dashboard_feedback_updates')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'feedback_messages', filter: 'sender_type=eq.user' }, () => {
+        fetchDashboardStats(false); 
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
-  const fetchDashboardStats = async () => {
+  const fetchDashboardStats = async (showLoading = true) => {
     try {
-      setIsLoading(true);
+      if (showLoading) setIsLoading(true);
       
       const [
         { count: speciesCount },
         { count: pendingCount },
         { count: researcherCount },
         { count: censusCount },
+        { count: feedbackCount }, 
         { data: recentLogs }
       ] = await Promise.all([
         supabase.from('birds').select('*', { count: 'exact', head: true }),
         supabase.from('observations').select('*', { count: 'exact', head: true }).eq('is_verified', false),
-        supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'researcher'),
+        
+        // ➤ FIX: Changed 'profiles' to 'app_users' to count your actual researchers!
+        supabase.from('app_users').select('*', { count: 'exact', head: true }).neq('role', 'admin'), 
+        
         supabase.from('observations').select('*', { count: 'exact', head: true }).eq('type', 'census'),
+        supabase.from('observations').select('*', { count: 'exact', head: true }).eq('needs_feedback', true).eq('feedback_status', 'pending'),
         supabase.from('observations').select('*').order('created_at', { ascending: false }).limit(4)
       ]);
 
@@ -53,35 +70,23 @@ const Dashboard = () => {
         totalSpecies: speciesCount || 0,
         pendingLogs: pendingCount || 0,
         activeResearchers: researcherCount || 0,
-        censusLogs: censusCount || 0
+        censusLogs: censusCount || 0,
+        pendingFeedback: feedbackCount || 0 
       });
 
-      // --- FETCH THE PROFILE NAMES FOR THE ACTIVITY FEED ---
       if (recentLogs && recentLogs.length > 0) {
-        
-        // 1. Extract all the unique user_ids from the recent logs
         const userIds = [...new Set(recentLogs.map(log => log.user_id).filter(Boolean))];
-        
         let profilesMap = {};
         
-        // 2. Fetch only the profiles that match those IDs
         if (userIds.length > 0) {
-          const { data: profilesData } = await supabase
-            .from('app_users')
-            .select('id, full_name')
-            .in('id', userIds);
-            
+          const { data: profilesData } = await supabase.from('app_users').select('id, full_name').in('id', userIds);
           if (profilesData) {
-            // Create a quick lookup dictionary { "id": "Full Name" }
             profilesData.forEach(p => { profilesMap[p.id] = p.full_name; });
           }
         }
 
-        // 3. Format the Activity Feed with the Real Names
         const formattedActivity = recentLogs.map((log) => {
           const dateStr = new Date(log.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-          
-          // Look up the name, fallback to 'Unknown Explorer' if not found
           const actualName = profilesMap[log.user_id] || 'Unknown Explorer';
           
           return {
@@ -98,12 +103,22 @@ const Dashboard = () => {
       } else {
         setActivityFeed([]);
       }
-
     } catch (error) {
       console.error('Error fetching dashboard stats:', error.message);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Helper styles for clickable cards
+  const clickableCardStyles = {
+    borderRadius: 4, 
+    boxShadow: '0 4px 20px rgba(0,0,0,0.03)', 
+    border: '1px solid #E2E8F0', 
+    height: '100%',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 8px 25px rgba(0,0,0,0.1)' }
   };
 
   return (
@@ -125,17 +140,16 @@ const Dashboard = () => {
           </Typography>
         </Box>
         <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 2 }}>
-          <Button onClick={fetchDashboardStats} variant="contained" sx={{ bgcolor: 'white', color: '#1B4332', fontWeight: 700, '&:hover': { bgcolor: '#f0f0f0' } }}>
+          <Button onClick={() => fetchDashboardStats(true)} variant="contained" sx={{ bgcolor: 'white', color: '#1B4332', fontWeight: 700, '&:hover': { bgcolor: '#f0f0f0' } }}>
             Refresh Data
           </Button>
         </Box>
       </Box>
 
-      {/* KPI STAT CARDS */}
+      {/* KPI STAT CARDS (Now Fully Clickable!) */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: '1px solid #E2E8F0', height: '100%' }}>
+          <Card sx={clickableCardStyles} onClick={() => navigate('/species')}>
             <CardContent sx={{ p: 3 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                 <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: '#E8F5E9', color: '#2E7D32' }}><ExploreRoundedIcon /></Box>
@@ -148,7 +162,7 @@ const Dashboard = () => {
         </Grid>
 
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: '1px solid #E2E8F0', height: '100%' }}>
+          <Card sx={clickableCardStyles} onClick={() => navigate('/observations')}>
             <CardContent sx={{ p: 3 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                 <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: '#FFF8E1', color: '#F57F17' }}><PendingActionsRoundedIcon /></Box>
@@ -160,8 +174,9 @@ const Dashboard = () => {
           </Card>
         </Grid>
 
+        {/* ➤ THE FIXED RESEARCHERS CARD */}
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: '1px solid #E2E8F0', height: '100%' }}>
+          <Card sx={clickableCardStyles} onClick={() => navigate('/users')}>
             <CardContent sx={{ p: 3 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                 <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: '#F3F4F6', color: '#4B5563' }}><GroupsRoundedIcon /></Box>
@@ -173,7 +188,7 @@ const Dashboard = () => {
         </Grid>
 
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: '1px solid #E2E8F0', height: '100%' }}>
+          <Card sx={clickableCardStyles} onClick={() => navigate('/census')}>
             <CardContent sx={{ p: 3 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                 <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: '#E0F2FE', color: '#0369A1' }}><AssessmentRoundedIcon /></Box>
@@ -234,12 +249,37 @@ const Dashboard = () => {
           <Paper sx={{ borderRadius: 4, border: '1px solid #E2E8F0', boxShadow: '0 4px 20px rgba(0,0,0,0.02)', p: 3, height: '100%' }}>
             <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.dark', mb: 3 }}>Quick Links</Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Button variant="outlined" color="primary" fullWidth startIcon={<PendingActionsRoundedIcon />} sx={{ py: 1.5, justifyContent: 'flex-start', px: 3, borderRadius: 3, fontWeight: 700, color: '#F57F17', borderColor: '#F57F17', '&:hover': { bgcolor: '#FFF8E1', borderColor: '#F57F17' } }}>
-                Review Pending Logs
+              
+              <Button 
+                onClick={() => navigate('/feedback')}
+                variant="outlined" 
+                color="primary" 
+                fullWidth 
+                startIcon={
+                  <Badge badgeContent={stats.pendingFeedback} color="error" sx={{ '& .MuiBadge-badge': { fontWeight: 'bold' } }}>
+                    <ForumRoundedIcon />
+                  </Badge>
+                } 
+                sx={{ py: 1.5, justifyContent: 'flex-start', px: 3, borderRadius: 3, fontWeight: 700, color: '#F57F17', borderColor: '#F57F17', '&:hover': { bgcolor: '#FFF8E1', borderColor: '#F57F17' } }}
+              >
+                Review Expert Requests
               </Button>
+
+              <Button 
+                onClick={() => navigate('/observations')}
+                variant="outlined" 
+                color="primary" 
+                fullWidth 
+                startIcon={<PendingActionsRoundedIcon />} 
+                sx={{ py: 1.5, justifyContent: 'flex-start', px: 3, borderRadius: 3, fontWeight: 700 }}
+              >
+                Open General Ledger
+              </Button>
+
               <Button variant="outlined" color="primary" fullWidth startIcon={<MapRoundedIcon />} sx={{ py: 1.5, justifyContent: 'flex-start', px: 3, borderRadius: 3, fontWeight: 700 }}>
                 Open Territory Map
               </Button>
+
               <Box sx={{ mt: 2, p: 2, bgcolor: '#F8FAFC', borderRadius: 3, border: '1px dashed #B0BEC5' }}>
                 <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.secondary', mb: 1 }}>System Status</Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
